@@ -36,14 +36,12 @@ MediFlow SecureAI serves patients, clinicians, hospital administrators, and oper
 
 ### Team Name
 
-`Add your team name here`
+`BitCore Novas`
 
 ### Team Members
 
-- Add member name — role / GitHub / LinkedIn
-- Add member name — role / GitHub / LinkedIn
-- Add member name — role / GitHub / LinkedIn
-- Add member name — role / GitHub / LinkedIn
+- Souhardya Mridha (Leader) | github.com/ItsMeSouhardya | linkedin.com/in/itsmesouhardya
+- Sourashree Mukherjee (Member) | github.com/sourashreemukherjeenit-web | linkedin.com/in/itsmesouhardya
 
 ### Our Approach
 
