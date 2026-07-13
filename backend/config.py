@@ -17,6 +17,20 @@ def _bool(name: str, default: bool = False) -> bool:
     return os.getenv(name, str(default)).strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _normalize_database_url(url: str) -> str:
+    """Select psycopg 3 for provider URLs that omit a SQLAlchemy driver.
+
+    Render exposes ``postgresql://`` connection strings. SQLAlchemy otherwise
+    treats that as the legacy psycopg2 driver, which this project deliberately
+    does not install.
+    """
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+psycopg://", 1)
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+psycopg://", 1)
+    return url
+
+
 def _database_url(environment: str) -> str:
     if environment == "testing":
         configured = os.getenv("TEST_DATABASE_URL")
@@ -26,7 +40,7 @@ def _database_url(environment: str) -> str:
 
     configured = os.getenv("DATABASE_URL")
     if configured:
-        return configured
+        return _normalize_database_url(configured)
 
     if _bool("MEDIFLOW_ALLOW_SQLITE"):
         return f"sqlite+pysqlite:///{(BASE_DIR / 'database.db').as_posix()}"

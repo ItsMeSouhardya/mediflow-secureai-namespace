@@ -80,7 +80,7 @@ TELEMEDICINE_JITSI_APP_ID=mediflow
 |---|---|
 | `BLOCKCHAIN_RPC_URL` | Ethereum RPC endpoint (e.g. Alchemy/Infura or local Hardhat) |
 | `BLOCKCHAIN_CONTRACT_ADDRESS` | Deployed MediFlow integrity contract address |
-| `BLOCKCHAIN_SIGNER_KEY` | Private key for signing transactions (never the mnemonic) |
+| `BLOCKCHAIN_DEPLOYER_PRIVATE_KEY` | Private key for signing transactions (never the mnemonic) |
 | `BLOCKCHAIN_REFERENCE_SECRET` | HMAC key for opaque reference generation |
 
 ### 2.6 Redis

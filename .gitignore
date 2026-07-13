@@ -26,6 +26,7 @@ backend/__pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+.verification/
 
 # Databases, backups, uploads, secrets, and generated runtime data
 *.db

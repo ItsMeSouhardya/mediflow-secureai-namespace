@@ -21,9 +21,9 @@ Architecture rules
   service functions and commit.
 - room_reference is generated as a UUID-based slug — never a patient
   name or appointment ID — so it carries no PII (11.6 / 11.8).
-- The Jitsi JWT is signed with TELEMEDICINE_JITSI_SECRET if configured;
-  otherwise a self-signed development token is issued with a clear
-  warning logged.
+- The Jitsi JWT is signed with TELEMEDICINE_JITSI_SECRET for a private,
+  JWT-enabled deployment. Public Jitsi rooms receive a direct join URL and
+  never receive a token that the provider cannot validate.
 - Unauthorised join attempts (wrong role, wrong patient/doctor, expired
   token) raise ApiProblem before a room token is issued.
 """
@@ -180,9 +180,10 @@ def issue_room_token(
 ) -> RoomToken:
     """Issue a short-lived signed room access token (11.6).
 
-    The token is a JWT signed with TELEMEDICINE_JITSI_SECRET.  If the
-    secret is not configured, a development-only unsigned token is issued
-    and a warning is logged.
+    The token is a JWT signed with TELEMEDICINE_JITSI_SECRET for private
+    JWT-enabled Jitsi deployments. If the secret is not configured, the
+    application returns an opaque access reference and a direct public-room
+    URL without a misleading ``?jwt=`` parameter.
 
     The caller receives the join_url; the backend never exposes the raw
     room_reference except inside the signed token payload.
@@ -191,6 +192,7 @@ def issue_room_token(
     expires_at = now + timedelta(minutes=ROOM_TOKEN_TTL_MINUTES)
     jitsi_domain = config.get("TELEMEDICINE_JITSI_DOMAIN", "meet.jit.si")
     secret = config.get("TELEMEDICINE_JITSI_SECRET", "")
+    app_id = config.get("TELEMEDICINE_JITSI_APP_ID", "mediflow")
 
     claims: dict = {
         "context": {
@@ -207,7 +209,7 @@ def issue_room_token(
             },
         },
         "aud": "jitsi",
-        "iss": "mediflow",
+        "iss": app_id,
         "sub": jitsi_domain,
         "room": tele.room_reference,
         "iat": int(now.timestamp()),
@@ -217,19 +219,13 @@ def issue_room_token(
 
     if secret:
         token_str = _jwt.encode(claims, secret, algorithm="HS256")
+        join_url = f"https://{jitsi_domain}/{tele.room_reference}?jwt={token_str}"
     else:
-        logger.warning(
-            "TELEMEDICINE_JITSI_SECRET is not configured — issuing unsigned "
-            "development room token for session %s. Do NOT use in production.",
-            tele.public_id,
-        )
-        # Unsigned base64url-encoded claims — clearly not production-safe.
-        import base64, json
-        token_str = base64.urlsafe_b64encode(
-            json.dumps(claims).encode()
-        ).decode().rstrip("=")
-
-    join_url = f"https://{jitsi_domain}/{tele.room_reference}?jwt={token_str}"
+        # The API has already authorised the caller. Public Jitsi does not know
+        # this application's signing key, so a fabricated JWT would cause valid
+        # users to be rejected by the provider.
+        token_str = secrets.token_urlsafe(32)
+        join_url = f"https://{jitsi_domain}/{tele.room_reference}"
 
     return RoomToken(
         token=token_str,

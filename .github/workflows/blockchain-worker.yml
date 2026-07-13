@@ -1,0 +1,52 @@
+name: Blockchain Processor
+
+on:
+  schedule:
+    - cron: "7 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: mediflow-blockchain-worker
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Process blockchain outbox once
+        working-directory: backend
+        env:
+          FLASK_ENV: production
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          CORS_ORIGINS: https://mediflow-secureai-souhardya.onrender.com
+          DOCUMENT_STORAGE_BACKEND: local
+          DOCUMENT_STORAGE_PATH: /tmp/mediflow-documents
+          DOCUMENT_ENCRYPTION_KEY: ${{ secrets.DOCUMENT_ENCRYPTION_KEY }}
+          BLOCKCHAIN_ENABLED: "true"
+          BLOCKCHAIN_RPC_URL: ${{ secrets.BLOCKCHAIN_RPC_URL }}
+          BLOCKCHAIN_CHAIN_ID: "11155111"
+          BLOCKCHAIN_CONTRACT_ADDRESS: ${{ secrets.BLOCKCHAIN_CONTRACT_ADDRESS }}
+          BLOCKCHAIN_DEPLOYER_PRIVATE_KEY: ${{ secrets.BLOCKCHAIN_DEPLOYER_PRIVATE_KEY }}
+          BLOCKCHAIN_REFERENCE_SECRET: ${{ secrets.BLOCKCHAIN_REFERENCE_SECRET }}
+          BLOCKCHAIN_CONFIRMATIONS: "1"
+          BLOCKCHAIN_DEVELOPMENT_UNLOCKED_ACCOUNT: "false"
+        run: python -m flask --app app blockchain-worker --once --limit 50
