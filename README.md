@@ -181,9 +181,9 @@ Use [the Render prototype deployment guide](docs/render-prototype-deployment.md)
 
 ## 🎥 Demo & Deliverables
 
-- **Demo Video Link (Mandatory):** [[Paste link](https://drive.google.com/file/d/11YTZh0cPUQsh4r5KPkUtzz4urcc1Kuek/view)]
-- **Deployment Link (Recommended):** [[Paste link](https://mediflow-secureai-souhardya.onrender.com)]
-- **Pitch Deck / PPT (Optional):** [[Paste link](https://drive.google.com/drive/u/0/folders/1Pyf58amSAHZh24GEUv-Ie-3SxFJM4vC-)]
+- **Demo Video Link (Mandatory):** [[Open link](https://drive.google.com/file/d/11YTZh0cPUQsh4r5KPkUtzz4urcc1Kuek/view)]
+- **Deployment Link (Recommended):** [[Open link](https://mediflow-secureai-souhardya.onrender.com)]
+- **Pitch Deck / PPT (Optional):** [[Open link](https://drive.google.com/drive/u/0/folders/1Pyf58amSAHZh24GEUv-Ie-3SxFJM4vC-)]
 
 ---
 
