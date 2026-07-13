@@ -41,11 +41,7 @@ MediFlow SecureAI serves patients, clinicians, hospital administrators, and oper
 ### Team Members
 
 - Souhardya Mridha (Leader) 
-| github.com/ItsMeSouhardya 
-| linkedin.com/in/itsmesouhardya
 - Sourashree Mukherjee (Member) 
-| github.com/sourashreemukherjeenit-web 
-| linkedin.com/in/sourashree-m-7865ba366/
 
 ### Our Approach
 
