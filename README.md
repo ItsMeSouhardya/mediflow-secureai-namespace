@@ -214,4 +214,4 @@ Core open-source technologies include React, Vite, Flask, SQLAlchemy, PostgreSQL
 
 ## 🏁 Final Words
 
-MediFlow SecureAI is a prototype for demonstrating how hospital operations, patient experience, security, and verifiable integrity can work together in one platform. It is not a substitute for clinical judgment and is not intended for production medical use without formal security, privacy, regulatory, and clinical validation.
+MediFlow SecureAI is a prototype for demonstrating how hospital operations, patient experience, security, and verifiable integrity can work together in one platform. It is not a substitute for clinical judgment and is not intended for production medical use without formal security, privacy, regulatory, and clinical validation. Also make note of that due to hosting in free servers, the backend may not always load properly and which may sometimes show error for particular features and pages in the deployed link.
