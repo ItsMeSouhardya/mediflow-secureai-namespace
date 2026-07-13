@@ -1,0 +1,20 @@
+flask==3.1.1
+flask-cors==5.0.1
+gunicorn==23.0.0
+Flask-SQLAlchemy>=3.1,<4
+Flask-Migrate>=4,<5
+psycopg[binary]>=3.2,<4
+python-dotenv>=1,<2
+pytest>=8,<10
+Flask-Limiter>=3,<5
+pydantic>=2,<3
+argon2-cffi>=23,<26
+PyJWT>=2.8,<3
+# Task 5: encrypted document pipeline
+cryptography>=42,<44
+python-magic-bin>=0.4.14; sys_platform == "win32"
+python-magic>=0.4.27; sys_platform != "win32"
+pypdf>=4,<6
+web3>=7,<8
+redis>=5,<7
+# pytesseract>=0.3,<1  # OCR: install separately with Tesseract binary

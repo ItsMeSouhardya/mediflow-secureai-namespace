@@ -1,0 +1,28 @@
+# Project metadata and tool configuration — task 15.9
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--tb=short",
+    "--strict-markers",
+    "-q",
+]
+markers = [
+    "slow: marks tests as slow (deselect with -m 'not slow')",
+    "integration: marks tests that require a running database",
+    "e2e: marks full end-to-end tests",
+]
+
+[tool.bandit]
+targets = ["backend"]
+exclude_dirs = ["backend/.venv", "backend/tests", "backend/migrations"]
+skips = ["B101", "B404", "B603"]
+severity = "medium"
+confidence = "medium"
+
+[tool.pip-audit]
+# Run: pip-audit -r backend/requirements.txt --policy-file .safety-policy.yml
+require-hashes = false
+vulnerability-service = "pypi"

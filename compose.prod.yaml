@@ -1,0 +1,147 @@
+# Production Docker Compose — task 15.11
+# Usage:
+#   docker compose -f compose.prod.yaml up -d
+#
+# Secrets are passed exclusively via environment variables.
+# Never commit a .env file with real credentials.
+# See docs/deployment.md for secrets-management guidance.
+
+services:
+
+  # ── Frontend (Nginx + React SPA) ────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    image: mediflow/frontend:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"    # TLS termination handled by a reverse proxy / load balancer
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [mediflow]
+
+  # ── API (Gunicorn + Flask) ───────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: mediflow/api:latest
+    restart: unless-stopped
+    environment:
+      FLASK_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      SECRET_KEY: ${SECRET_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      RATELIMIT_STORAGE_URI: redis://redis:6379/0
+      DOCUMENT_ENCRYPTION_KEY: ${DOCUMENT_ENCRYPTION_KEY}
+      DOCUMENT_ENCRYPTION_KEY_PREV: ${DOCUMENT_ENCRYPTION_KEY_PREV:-}
+      DOCUMENT_STORAGE_BACKEND: ${DOCUMENT_STORAGE_BACKEND:-local}
+      DOCUMENT_STORAGE_PATH: /data/documents
+      TELEMEDICINE_JITSI_SECRET: ${TELEMEDICINE_JITSI_SECRET}
+      TELEMEDICINE_JITSI_DOMAIN: ${TELEMEDICINE_JITSI_DOMAIN:-meet.jit.si}
+      BLOCKCHAIN_RPC_URL: ${BLOCKCHAIN_RPC_URL:-}
+      BLOCKCHAIN_CONTRACT_ADDRESS: ${BLOCKCHAIN_CONTRACT_ADDRESS:-}
+      BLOCKCHAIN_SIGNER_KEY: ${BLOCKCHAIN_SIGNER_KEY:-}
+      BLOCKCHAIN_REFERENCE_SECRET: ${BLOCKCHAIN_REFERENCE_SECRET:-}
+      MFA_REQUIRED_FOR_STAFF: ${MFA_REQUIRED_FOR_STAFF:-true}
+    volumes:
+      - document_store:/data/documents
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "5000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/health')\""]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+    networks: [mediflow]
+
+  # ── Blockchain worker ────────────────────────────────────────────────────
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    image: mediflow/worker:latest
+    restart: unless-stopped
+    environment:
+      FLASK_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      SECRET_KEY: ${SECRET_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      BLOCKCHAIN_RPC_URL: ${BLOCKCHAIN_RPC_URL:-}
+      BLOCKCHAIN_CONTRACT_ADDRESS: ${BLOCKCHAIN_CONTRACT_ADDRESS:-}
+      BLOCKCHAIN_SIGNER_KEY: ${BLOCKCHAIN_SIGNER_KEY:-}
+      BLOCKCHAIN_REFERENCE_SECRET: ${BLOCKCHAIN_REFERENCE_SECRET:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [mediflow]
+
+  # ── PostgreSQL ───────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mediflow}
+      POSTGRES_USER: ${POSTGRES_USER:-mediflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - mediflow_postgres_data:/var/lib/postgresql/data
+      - ./scripts/db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mediflow} -d ${POSTGRES_DB:-mediflow}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    expose:
+      - "5432"
+    networks: [mediflow]
+
+  # ── Redis ────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - mediflow_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    expose:
+      - "6379"
+    networks: [mediflow]
+
+  # ── Development blockchain node (profile: blockchain) ───────────────────
+  blockchain:
+    image: node:22-alpine
+    profiles: ["blockchain"]
+    working_dir: /workspace/blockchain
+    volumes:
+      - ./:/workspace
+      - mediflow_blockchain_node_modules:/workspace/blockchain/node_modules
+    command: sh -c "npm install && npm run node -- --hostname 0.0.0.0"
+    ports:
+      - "8545:8545"
+    networks: [mediflow]
+
+volumes:
+  mediflow_postgres_data:
+  mediflow_redis_data:
+  mediflow_blockchain_node_modules:
+  document_store:
+
+networks:
+  mediflow:
+    driver: bridge

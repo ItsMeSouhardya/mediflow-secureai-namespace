@@ -1,0 +1,10 @@
+| Parameter        | Set 1: Stable  | Set 2: High alerts | Set 3: Low alerts |
+|---               |---:            |---:                |---:               |
+| Heart Rate       | 74 bpm         | 128 bpm            | 46 bpm            |
+| Blood Pressure   | 118/78 mmHg    | 186/122 mmHg       | 86/54 mmHg        |
+| Blood Oxygen     | 98%            | 91%                | 89%               | 
+| Temperature      | 36.8°C         | 39.4°C             | 34.6°C            |
+| Blood Glucose    | 102 mg/dL      | 268 mg/dL          | 54 mg/dL          |
+| Respiratory Rate | 16 breaths/min | 28 breaths/min     | 8 breaths/min     |
+
+For Blood Pressure, enter the first number as systolic and the second as diastolic. You can use Demo Set 1, Demo Set 2, or Demo Set 3 as the optional source reference.

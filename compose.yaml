@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mediflow}
+      POSTGRES_USER: ${POSTGRES_USER:-mediflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mediflow-dev-only}
+    ports:
+      - "5432:5432"
+    volumes:
+      - mediflow_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mediflow} -d ${POSTGRES_DB:-mediflow}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  blockchain:
+    image: node:22-alpine
+    profiles: ["blockchain"]
+    working_dir: /workspace/blockchain
+    volumes:
+      - ./:/workspace
+      - mediflow_blockchain_node_modules:/workspace/blockchain/node_modules
+    command: sh -c "npm install && npm run node -- --hostname 0.0.0.0"
+    ports:
+      - "8545:8545"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8545',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',method:'eth_chainId',params:[],id:1})}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - mediflow_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  mediflow_postgres_data:
+  mediflow_blockchain_node_modules:
+  mediflow_redis_data:

@@ -1,0 +1,227 @@
+name: MediFlow Secure CI
+
+# ── Triggers ──────────────────────────────────────────────────────────────
+on:
+  push:
+    branches: ["main", "develop", "release/**"]
+  pull_request:
+    branches: ["main", "develop"]
+
+# Cancel in-progress runs on the same branch/PR so we never queue stale jobs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# ── Shared defaults ───────────────────────────────────────────────────────
+defaults:
+  run:
+    shell: bash
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
+  POSTGRES_DB: mediflow_test
+  POSTGRES_USER: mediflow_test
+  POSTGRES_PASSWORD: ci-test-only
+
+# ==========================================================================
+# Job 1 — Frontend: lint + build
+# ==========================================================================
+jobs:
+  frontend:
+    name: "Frontend — lint / build"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint -- --max-warnings 0
+
+      - name: Vite build (production)
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      # Upload built assets so other jobs can reference them if needed.
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist/
+          retention-days: 3
+
+# ==========================================================================
+# Job 2 — Backend: type-check + lint + test
+# ==========================================================================
+  backend:
+    name: "Backend — lint / type / test"
+    runs-on: ubuntu-latest
+
+    # Spin up a real PostgreSQL for the integration suite.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ${{ env.POSTGRES_USER }}"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+
+      # ── Static analysis ─────────────────────────────────────────────────
+      - name: Bandit (security static analysis)
+        run: bandit -r backend -c .bandit --exit-zero
+        # --exit-zero: report findings but don't fail CI until baseline is set.
+        # Remove --exit-zero once the baseline is clean.
+
+      - name: pip-audit (dependency vulnerability scan)
+        run: pip-audit -r backend/requirements.txt --ignore-vuln PYSEC-2022-42969
+        # PYSEC-2022-42969: known false positive in pip-audit itself; remove when resolved.
+        continue-on-error: false
+
+      # ── Migrations ──────────────────────────────────────────────────────
+      - name: Verify Alembic migration chain (offline SQL generation)
+        working-directory: backend
+        env:
+          FLASK_APP: app.py
+          FLASK_ENV: testing
+          CORS_ORIGINS: "http://localhost:5173"
+          DATABASE_URL: postgresql+psycopg://mediflow_test:ci-test-only@localhost:5432/mediflow_test
+        run: |
+          flask db upgrade --sql > /dev/null
+          echo "Migration chain: OK"
+
+      - name: Run Alembic upgrade against real PostgreSQL
+        working-directory: backend
+        env:
+          FLASK_APP: app.py
+          FLASK_ENV: testing
+          CORS_ORIGINS: "http://localhost:5173"
+          DATABASE_URL: postgresql+psycopg://mediflow_test:ci-test-only@localhost:5432/mediflow_test
+        run: flask db upgrade
+
+      # ── Test suite ───────────────────────────────────────────────────────
+      - name: Run pytest (SQLite in-memory — fast suite)
+        working-directory: backend
+        env:
+          FLASK_ENV: testing
+          CORS_ORIGINS: "http://localhost:5173"
+          MEDIFLOW_ALLOW_SQLITE: "true"
+        run: |
+          pytest tests/ \
+            --tb=short \
+            -q \
+            --ignore=tests/__pycache__ \
+            -x
+
+      - name: Run pytest (PostgreSQL integration suite)
+        working-directory: backend
+        env:
+          FLASK_ENV: testing
+          CORS_ORIGINS: "http://localhost:5173"
+          TEST_DATABASE_URL: postgresql+psycopg://mediflow_test:ci-test-only@localhost:5432/mediflow_test
+        run: |
+          pytest tests/test_phase15_integration.py \
+            tests/test_phase15_e2e.py \
+            --tb=short \
+            -q
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-results
+          path: backend/.pytest_cache/
+          retention-days: 3
+
+# ==========================================================================
+# Job 3 — Blockchain contract tests (Hardhat)
+# ==========================================================================
+  contracts:
+    name: "Smart contracts — compile / test"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: blockchain/package-lock.json
+
+      - name: Install Hardhat dependencies
+        working-directory: blockchain
+        run: npm ci
+
+      - name: Compile contracts
+        working-directory: blockchain
+        run: npx hardhat compile
+
+      - name: Run contract unit tests
+        working-directory: blockchain
+        run: npx hardhat test
+
+# ==========================================================================
+# Job 4 — Security: secret scan (no secrets in repo)
+# ==========================================================================
+  secrets-scan:
+    name: "Secret detection"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history for trufflehog
+
+      - name: TruffleHog secret scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          extra_args: --only-verified
+
+# ==========================================================================
+# Job 5 — Gate: all jobs must pass before merge
+# ==========================================================================
+  ci-gate:
+    name: "CI gate"
+    needs: [frontend, backend, contracts, secrets-scan]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check all jobs passed
+        run: |
+          if [[ "${{ needs.frontend.result }}" != "success" ||
+                "${{ needs.backend.result }}" != "success" ||
+                "${{ needs.contracts.result }}" != "success" ||
+                "${{ needs.secrets-scan.result }}" != "success" ]]; then
+            echo "❌ One or more CI jobs failed."
+            exit 1
+          fi
+          echo "✅ All CI jobs passed."

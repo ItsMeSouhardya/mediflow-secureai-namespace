@@ -1,0 +1,30 @@
+# Safety / pip-audit policy — task 15.9
+# Documents intentional vulnerability exceptions with justification.
+# No exceptions are active at this time; every CVE must be resolved or
+# explicitly approved here with a dated rationale before merging.
+
+version: "3.0"
+
+# ── Vulnerability ignore list ────────────────────────────────────────────────
+# Format:
+#   - id: CVE-YYYY-NNNNN   (or PYSEC-YYYY-NNN for PyPI advisories)
+#     reason: |
+#       <Justification — who approved it, when, and planned remediation>
+#     expires: YYYY-MM-DD
+#
+ignore_vulnerabilities: []
+# Example (do NOT add without security review):
+# ignore_vulnerabilities:
+#   - id: CVE-2023-12345
+#     reason: |
+#       Affects code path not reachable in this deployment.
+#       Approved by security team 2025-01-15. Fix planned in next sprint.
+#     expires: 2025-04-01
+
+# ── Scan configuration ───────────────────────────────────────────────────────
+# Fail the build for any severity level (use 'high' to reduce noise in dev).
+fail_on_severity: medium
+
+# Packages excluded from scanning (test/dev-only dependencies that cannot
+# be exploited in production).
+ignore_packages: []

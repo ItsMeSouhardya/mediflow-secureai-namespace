@@ -1,0 +1,38 @@
+# Blockchain outbox / background worker image — task 15.11
+# Shares the same base as Dockerfile.api; runs the flask blockchain-worker CLI command.
+# Restarts automatically via the compose restart policy so downtime never blocks EHR.
+
+ARG PYTHON_VERSION=3.12
+FROM python:${PYTHON_VERSION}-slim AS builder
+
+WORKDIR /build
+COPY backend/requirements.txt .
+RUN pip install --upgrade pip \
+ && pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+# ---------------------------------------------------------------------------
+FROM python:${PYTHON_VERSION}-slim AS runtime
+
+RUN useradd --create-home --no-log-init --uid 1001 mediflow
+WORKDIR /app
+
+COPY --from=builder /install /usr/local
+COPY backend/ ./
+
+RUN chown -R mediflow:mediflow /app \
+ && chmod -R o-rwx /app
+
+USER mediflow
+
+ENV FLASK_APP=app.py \
+    FLASK_ENV=production \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    # How often (seconds) the worker polls for pending blockchain transactions
+    BLOCKCHAIN_POLL_INTERVAL=15
+
+# No HTTP port — this is a worker, not a web process.
+HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
+  CMD pgrep -f "blockchain-worker" > /dev/null || exit 1
+
+CMD flask blockchain-worker

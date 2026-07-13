@@ -1,0 +1,15 @@
+[bandit]
+# Bandit static security analysis configuration — task 15.9
+targets = backend
+recursive = true
+exclude = backend/.venv,backend/tests,backend/migrations,backend/__pycache__
+
+# Skip tests that produce too many false positives for this codebase.
+# B101 assert_used  — asserts are valid in tests; test dir already excluded above
+# B404 import_subprocess — not present in codebase
+# B603 subprocess_without_shell — not used
+skips = B101,B404,B603
+
+# Minimum severity and confidence to report
+severity = medium
+confidence = medium

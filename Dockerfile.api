@@ -1,0 +1,56 @@
+# Production API image — task 15.11
+# Multi-stage: build deps in a builder layer, copy only the venv to the final image.
+# Runs as a non-root user. No secrets baked in — all config via environment variables.
+
+ARG PYTHON_VERSION=3.12
+FROM python:${PYTHON_VERSION}-slim AS builder
+
+WORKDIR /build
+COPY backend/requirements.txt .
+
+RUN pip install --upgrade pip \
+ && pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+# ---------------------------------------------------------------------------
+FROM python:${PYTHON_VERSION}-slim AS runtime
+
+# Security: run as non-root
+RUN useradd --create-home --no-log-init --uid 1001 mediflow
+WORKDIR /app
+
+# Copy installed packages from builder
+COPY --from=builder /install /usr/local
+
+# Copy application source (no .venv, no tests, no migrations/versions in image)
+COPY backend/ ./
+
+# Drop write access to source files
+RUN chown -R mediflow:mediflow /app \
+ && chmod -R o-rwx /app
+
+USER mediflow
+
+ENV FLASK_APP=app.py \
+    FLASK_ENV=production \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    # Gunicorn tuning — override via environment
+    GUNICORN_WORKERS=4 \
+    GUNICORN_THREADS=2 \
+    GUNICORN_TIMEOUT=120
+
+EXPOSE 5000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/v1/health')" \
+  || exit 1
+
+CMD gunicorn app:create_app\(\) \
+      --bind 0.0.0.0:5000 \
+      --workers ${GUNICORN_WORKERS} \
+      --threads ${GUNICORN_THREADS} \
+      --timeout ${GUNICORN_TIMEOUT} \
+      --access-logfile - \
+      --error-logfile - \
+      --log-level info \
+      --forwarded-allow-ips "*"

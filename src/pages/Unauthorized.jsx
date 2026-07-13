@@ -1,0 +1,2 @@
+import { Link } from 'react-router-dom'
+export default function Unauthorized() { return <section className="min-h-screen pt-36 text-center"><h1 className="text-3xl font-extrabold text-slate-900">Access not permitted</h1><p className="mt-3 text-slate-600">Your account role cannot open this workspace.</p><Link to="/" className="mt-6 inline-block rounded-xl bg-blue-700 px-5 py-3 font-semibold text-white">Return home</Link></section> }
